@@ -54,15 +54,20 @@ const startTyping = () => {
   }
 }
 
-/* 🎵 BGM */
-const audio = new Audio(bgm)
-audio.loop = true
-audio.volume = 0.25
+/* 🎵 BGM — Android / iOS 공통 대응 */
+let audio = null
 
 const playBgm = async () => {
   try {
+    if (!audio) {
+      audio = new Audio(bgm)
+      audio.loop = true
+      audio.volume = 0.25
+    }
     await audio.play()
-  } catch {}
+  } catch (e) {
+    console.log('BGM blocked:', e)
+  }
 }
 
 /* ❄️ 눈 */
@@ -74,12 +79,12 @@ const snows = Array.from({ length: 40 }).map(() => ({
   size: 4 + Math.random() * 4 + 'px',
 }))
 
-/* 📩 첫 터치 = 편지 열기 */
+/* 📩 첫 터치 = 편지 열기 + 음악 시작 */
 const openLetter = async () => {
   if (isOpened.value) return
 
   isOpened.value = true
-  await playBgm()
+  await playBgm()   // 🔥 반드시 터치 이벤트 안
   startTyping()
 }
 </script>
@@ -127,15 +132,15 @@ const openLetter = async () => {
   justify-content: center;
   align-items: center;
   padding: 20px;
-  overflow-x: hidden;   /* 🔥 오른쪽 잘림 방지 */
+  overflow-x: hidden;
   overflow-y: hidden;
   font-family: 'Pretendard', system-ui, -apple-system, sans-serif;
 }
 
 .card {
   background: rgba(255, 255, 255, 0.96);
-  width: 100%;          /* 🔥 vw 제거 */
-  max-width: 340px;     /* 🔥 기준 폭 */
+  width: 100%;
+  max-width: 340px;
   padding: 28px 24px;
   border-radius: 22px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
@@ -185,5 +190,4 @@ const openLetter = async () => {
     transform: translateY(110vh);
   }
 }
-
 </style>
