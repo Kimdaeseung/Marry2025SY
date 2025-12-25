@@ -1,7 +1,10 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import bgm from './assets/TheFirstNoel.mp3'
 
+/* ======================
+   편지 내용
+====================== */
 const messageLines = [
   '메리 크리스마스 수연아~',
   '',
@@ -26,24 +29,36 @@ const messageLines = [
   '— From. 마음을 담아서 바봉이가',
 ]
 
-/* ✉️ 상태 */
-const isOpened = ref(false)
+/* ======================
+   OS 판별
+====================== */
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent)
+const isAndroid = computed(() => !isIOS())
 
-/* ✍️ 타이핑 */
+/* ======================
+   상태
+====================== */
+const isOpened = ref(false)
 const displayedText = ref('')
+const audioRef = ref(null)
+const hasPlayedAudio = ref(false)
+
+/* ======================
+   타이핑 효과
+====================== */
 let lineIndex = 0
 let charIndex = 0
 
 const startTyping = () => {
   if (lineIndex >= messageLines.length) return
 
-  const currentLine = messageLines[lineIndex]
+  const line = messageLines[lineIndex]
 
-  if (charIndex <= currentLine.length) {
+  if (charIndex <= line.length) {
     displayedText.value =
       messageLines.slice(0, lineIndex).join('\n') +
       '\n' +
-      currentLine.slice(0, charIndex)
+      line.slice(0, charIndex)
 
     charIndex++
     setTimeout(startTyping, 70)
@@ -54,21 +69,46 @@ const startTyping = () => {
   }
 }
 
-/* 🎵 오디오 ref (핵심) */
-const audioRef = ref(null)
-
-const playBgm = async () => {
-  try {
-    if (!audioRef.value) return
-    audioRef.value.volume = 0.25
-    audioRef.value.loop = true
-    await audioRef.value.play()
-  } catch (e) {
-    console.log('Audio blocked:', e)
-  }
+/* ======================
+   오디오 (동기 재생)
+====================== */
+const playBgmSync = () => {
+  if (!audioRef.value) return
+  audioRef.value.volume = 0.25
+  audioRef.value.loop = true
+  audioRef.value.play()
+  hasPlayedAudio.value = true
 }
 
-/* ❄️ 눈 */
+/* ======================
+   iOS: 편지 열 때 재생
+====================== */
+const openLetter = () => {
+  if (isOpened.value) return
+
+  isOpened.value = true
+
+  if (isIOS()) {
+    playBgmSync()
+  }
+
+  startTyping()
+}
+
+/* ======================
+   Android: 배경 터치 시 재생
+====================== */
+const handleBackgroundTouch = (e) => {
+  if (!isAndroid.value) return
+  if (hasPlayedAudio.value) return
+
+  e.preventDefault()
+  playBgmSync()
+}
+
+/* ======================
+   눈
+====================== */
 const snows = Array.from({ length: 40 }).map(() => ({
   left: Math.random() * 100 + '%',
   duration: 6 + Math.random() * 8 + 's',
@@ -76,24 +116,30 @@ const snows = Array.from({ length: 40 }).map(() => ({
   opacity: 0.4 + Math.random() * 0.6,
   size: 4 + Math.random() * 4 + 'px',
 }))
-
-/* 📩 터치 = 편지 + 음악 */
-const openLetter = async () => {
-  if (isOpened.value) return
-  isOpened.value = true
-  await playBgm()
-  startTyping()
-}
 </script>
 
 <template>
   <div
     class="page"
-    @touchstart.prevent="openLetter"
-    @click.prevent="openLetter"
+    @pointerdown="handleBackgroundTouch"
+    @click="openLetter"
   >
-    <!-- 🔥 반드시 DOM에 존재해야 함 -->
-    <audio ref="audioRef" :src="bgm" preload="auto"></audio>
+    <!-- 🎵 audio -->
+    <audio
+      ref="audioRef"
+      :src="bgm"
+      preload="auto"
+      playsinline
+    ></audio>
+
+    <!-- 💡 Android 안내 문구 -->
+    <div
+      v-if="isAndroid && !hasPlayedAudio"
+      class="android-hint"
+    >
+      배경을 한 번 터치하면<br />
+      음악이 시작돼요 🎵
+    </div>
 
     <div class="card">
       <div v-if="!isOpened" class="closed">
@@ -104,6 +150,7 @@ const openLetter = async () => {
       <pre v-else class="letter">{{ displayedText }}</pre>
     </div>
 
+    <!-- ❄️ 눈 -->
     <span
       v-for="(snow, i) in snows"
       :key="i"
@@ -133,6 +180,24 @@ const openLetter = async () => {
   font-family: 'Pretendard', system-ui, -apple-system, sans-serif;
 }
 
+/* 💡 Android 안내 */
+.android-hint {
+  position: fixed;
+  bottom: 28px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.4;
+  z-index: 5;
+  animation: fadePulse 2s ease-in-out infinite;
+}
+
+@keyframes fadePulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
 .card {
   background: rgba(255, 255, 255, 0.96);
   width: 100%;
@@ -141,6 +206,7 @@ const openLetter = async () => {
   border-radius: 22px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
   box-sizing: border-box;
+  z-index: 2;
 }
 
 .closed {
