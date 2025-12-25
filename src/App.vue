@@ -135,7 +135,7 @@ const openLetter = async () => {
 /* 💌 카드 */
 .card {
   background: rgba(255, 255, 255, 0.96);
-  width: clamp(320px, 90vw, 380px);
+  width: clamp(300px, 90vw, 380px);
   padding: 28px 24px;
   border-radius: 22px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
