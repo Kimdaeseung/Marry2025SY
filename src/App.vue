@@ -26,7 +26,7 @@ const messageLines = [
   '— From. 마음을 담아서 바봉이가',
 ]
 
-/* ✉️ 편지 상태 */
+/* ✉️ 편지 열림 상태 */
 const isOpened = ref(false)
 
 /* ✍️ 타이핑 */
@@ -65,7 +65,7 @@ const playBgm = async () => {
   } catch {}
 }
 
-/* ❄️ 눈 */
+/* ❄️ 눈 (한 번만 생성) */
 const snows = Array.from({ length: 40 }).map(() => ({
   left: Math.random() * 100 + '%',
   duration: 6 + Math.random() * 8 + 's',
@@ -119,26 +119,29 @@ const openLetter = async () => {
 </template>
 
 <style scoped>
-/* 🌌 배경 */
+/* 🌌 배경 — 모바일 초기 진입 안정화 핵심 */
 .page {
-  min-height: 100svh; /* 🔥 모바일 주소창 안정 */
+  min-height: 100svh; /* 🔥 안드/삼성 브라우저 최적 */
   background: linear-gradient(180deg, #0f2027, #203a43, #2c5364);
   display: flex;
   justify-content: center;
-  align-items: center;
+  padding-top: calc(50svh - 120px); /* 🔥 초기 중앙 고정 */
+  box-sizing: border-box;
   overflow: hidden;
-  padding: 20px;
+  padding-left: 20px;
+  padding-right: 20px;
   font-family: 'Pretendard', system-ui, -apple-system, sans-serif;
 }
 
 /* 💌 카드 */
 .card {
   background: rgba(255, 255, 255, 0.96);
-  width: min(92vw, 340px); /* 🔥 컴팩트한 카드 폭 */
+  width: min(92vw, 340px);
   padding: 28px 24px;
   border-radius: 22px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
   z-index: 2;
+  transform: translateY(-10px); /* 🔥 초기 밀림 보정 */
 }
 
 /* 📩 접힌 상태 */
@@ -165,7 +168,7 @@ const openLetter = async () => {
 /* ✍️ 편지 */
 .letter {
   white-space: pre-wrap;
-  font-size: 15px;
+  font-size: 15.5px;
   line-height: 1.75;
   color: #333;
   margin: 0;
