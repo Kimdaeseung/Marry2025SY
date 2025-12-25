@@ -90,7 +90,7 @@ const openLetter = async () => {
     @click="openLetter"
     @touchstart="openLetter"
   >
-    <div class="card" :class="{ opened: isOpened }">
+    <div class="card">
       <!-- 접힌 상태 -->
       <div v-if="!isOpened" class="closed">
         <div class="icon">✉️</div>
@@ -121,8 +121,7 @@ const openLetter = async () => {
 <style scoped>
 /* 🌌 배경 */
 .page {
-  min-height: 100dvh;
-  min-width: 360px;
+  min-height: 100svh; /* 🔥 모바일 주소창 안정 */
   background: linear-gradient(180deg, #0f2027, #203a43, #2c5364);
   display: flex;
   justify-content: center;
@@ -135,12 +134,11 @@ const openLetter = async () => {
 /* 💌 카드 */
 .card {
   background: rgba(255, 255, 255, 0.96);
-  width: clamp(300px, 90vw, 380px);
+  width: min(92vw, 340px); /* 🔥 컴팩트한 카드 폭 */
   padding: 28px 24px;
   border-radius: 22px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
   z-index: 2;
-  transition: transform 0.6s ease, box-shadow 0.6s ease;
 }
 
 /* 📩 접힌 상태 */
@@ -160,13 +158,14 @@ const openLetter = async () => {
 
 .hint {
   font-size: 15px;
-  opacity: 0.8;
+  opacity: 0.85;
+  letter-spacing: 0.02em;
 }
 
 /* ✍️ 편지 */
 .letter {
   white-space: pre-wrap;
-  font-size: 15.5px;
+  font-size: 15px;
   line-height: 1.75;
   color: #333;
   margin: 0;
