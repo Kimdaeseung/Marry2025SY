@@ -26,7 +26,7 @@ const messageLines = [
   '— From. 마음을 담아서 바봉이가',
 ]
 
-/* ✉️ 편지 상태 */
+/* ✉️ 상태 */
 const isOpened = ref(false)
 
 /* ✍️ 타이핑 */
@@ -54,19 +54,17 @@ const startTyping = () => {
   }
 }
 
-/* 🎵 BGM — Android / iOS 공통 대응 */
-let audio = null
+/* 🎵 오디오 ref (핵심) */
+const audioRef = ref(null)
 
 const playBgm = async () => {
   try {
-    if (!audio) {
-      audio = new Audio(bgm)
-      audio.loop = true
-      audio.volume = 0.25
-    }
-    await audio.play()
+    if (!audioRef.value) return
+    audioRef.value.volume = 0.25
+    audioRef.value.loop = true
+    await audioRef.value.play()
   } catch (e) {
-    console.log('BGM blocked:', e)
+    console.log('Audio blocked:', e)
   }
 }
 
@@ -79,12 +77,11 @@ const snows = Array.from({ length: 40 }).map(() => ({
   size: 4 + Math.random() * 4 + 'px',
 }))
 
-/* 📩 첫 터치 = 편지 열기 + 음악 시작 */
+/* 📩 터치 = 편지 + 음악 */
 const openLetter = async () => {
   if (isOpened.value) return
-
   isOpened.value = true
-  await playBgm()   // 🔥 반드시 터치 이벤트 안
+  await playBgm()
   startTyping()
 }
 </script>
@@ -92,21 +89,21 @@ const openLetter = async () => {
 <template>
   <div
     class="page"
-    @click="openLetter"
-    @touchstart="openLetter"
+    @touchstart.prevent="openLetter"
+    @click.prevent="openLetter"
   >
+    <!-- 🔥 반드시 DOM에 존재해야 함 -->
+    <audio ref="audioRef" :src="bgm" preload="auto"></audio>
+
     <div class="card">
-      <!-- 접힌 상태 -->
       <div v-if="!isOpened" class="closed">
         <div class="icon">✉️</div>
         <div class="hint">To 윤수연</div>
       </div>
 
-      <!-- 열린 상태 -->
       <pre v-else class="letter">{{ displayedText }}</pre>
     </div>
 
-    <!-- ❄️ 눈 -->
     <span
       v-for="(snow, i) in snows"
       :key="i"
@@ -132,8 +129,7 @@ const openLetter = async () => {
   justify-content: center;
   align-items: center;
   padding: 20px;
-  overflow-x: hidden;
-  overflow-y: hidden;
+  overflow: hidden;
   font-family: 'Pretendard', system-ui, -apple-system, sans-serif;
 }
 
@@ -144,7 +140,6 @@ const openLetter = async () => {
   padding: 28px 24px;
   border-radius: 22px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
-  z-index: 2;
   box-sizing: border-box;
 }
 
@@ -165,7 +160,6 @@ const openLetter = async () => {
 .hint {
   font-size: 15px;
   opacity: 0.85;
-  letter-spacing: 0.02em;
 }
 
 .letter {
