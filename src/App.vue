@@ -1,10 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import bgm from './assets/TheFirstNoel.mp3'
 
-/* ======================
-   편지 내용
-====================== */
 const messageLines = [
   '메리 크리스마스 수연아~',
   '',
@@ -29,23 +26,20 @@ const messageLines = [
   '— From. 마음을 담아서 바봉이가',
 ]
 
-/* ======================
-   OS 판별
-====================== */
+/* OS */
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent)
 const isAndroid = computed(() => !isIOS())
 
-/* ======================
-   상태
-====================== */
+/* 상태 */
 const isOpened = ref(false)
 const displayedText = ref('')
 const audioRef = ref(null)
 const hasPlayedAudio = ref(false)
 
-/* ======================
-   타이핑 효과
-====================== */
+/* 디버그(안드에서 왜 안 나는지 화면에 표시) */
+const audioStatus = ref('') // 예: "blocked: NotAllowedError" / "error: MEDIA_ERR_SRC_NOT_SUPPORTED" 등
+
+/* 타이핑 */
 let lineIndex = 0
 let charIndex = 0
 
@@ -53,7 +47,6 @@ const startTyping = () => {
   if (lineIndex >= messageLines.length) return
 
   const line = messageLines[lineIndex]
-
   if (charIndex <= line.length) {
     displayedText.value =
       messageLines.slice(0, lineIndex).join('\n') +
@@ -69,46 +62,103 @@ const startTyping = () => {
   }
 }
 
-/* ======================
-   오디오 (동기 재생)
-====================== */
-const playBgmSync = () => {
-  if (!audioRef.value) return
-  audioRef.value.volume = 0.25
-  audioRef.value.loop = true
-  audioRef.value.play()
-  hasPlayedAudio.value = true
+/* 오디오 에러 메시지 정리 */
+const mapMediaError = (err) => {
+  if (!err) return 'unknown error'
+  // HTMLMediaElement.error.code: 1~4
+  const code = err.code
+  if (code === 1) return 'MEDIA_ERR_ABORTED'
+  if (code === 2) return 'MEDIA_ERR_NETWORK'
+  if (code === 3) return 'MEDIA_ERR_DECODE'
+  if (code === 4) return 'MEDIA_ERR_SRC_NOT_SUPPORTED'
+  return `MEDIA_ERR_${code ?? 'UNKNOWN'}`
 }
 
-/* ======================
-   iOS: 편지 열 때 재생
-====================== */
-const openLetter = () => {
-  if (isOpened.value) return
+/* 가장 중요한: play()는 반드시 Promise 결과를 잡는다 */
+const tryPlay = async () => {
+  const el = audioRef.value
+  if (!el) {
+    audioStatus.value = 'audio element missing'
+    return
+  }
 
+  try {
+    // 안드에서 가끔 로드가 덜 된 채로 play하면 씹히는 케이스가 있어서 강제 준비
+    el.preload = 'auto'
+    el.loop = true
+    el.volume = 0.25
+    el.muted = false
+
+    // 어떤 기기에서 currentTime 접근이 막히는 경우 방지
+    try {
+      if (el.readyState === 0) {
+        el.load()
+      }
+    } catch {}
+
+    const p = el.play()
+    if (p && typeof p.then === 'function') {
+      await p
+    }
+
+    hasPlayedAudio.value = true
+    audioStatus.value = ''
+  } catch (e) {
+    // 여기서부터가 핵심: 안드에서 왜 막혔는지 "진짜 이유"가 나온다
+    const msg = e?.name ? `${e.name}: ${e.message ?? ''}` : String(e)
+    audioStatus.value = `blocked: ${msg}`
+
+    // 추가로 media error가 있으면 더 구체적으로 표시
+    const err = audioRef.value?.error
+    if (err) {
+      audioStatus.value += ` / error: ${mapMediaError(err)}`
+    }
+  }
+}
+
+/* iOS: 편지 열 때 재생 */
+const openLetter = async () => {
+  if (isOpened.value) return
   isOpened.value = true
 
   if (isIOS()) {
-    playBgmSync()
+    await tryPlay()
   }
 
   startTyping()
 }
 
-/* ======================
-   Android: 배경 터치 시 재생
-====================== */
-const handleBackgroundTouch = (e) => {
+/* Android: 배경(pointerdown)에서 재생 */
+const handleBackgroundTouch = async (e) => {
   if (!isAndroid.value) return
   if (hasPlayedAudio.value) return
 
+  // 안드에서 "사용자 제스처" 인정 확률 올리기
   e.preventDefault()
-  playBgmSync()
+
+  await tryPlay()
 }
 
-/* ======================
-   눈
-====================== */
+/* 오디오 element 자체 이벤트로도 상태 잡기 */
+onMounted(() => {
+  const el = audioRef.value
+  if (!el) return
+
+  el.addEventListener('error', () => {
+    const err = el.error
+    audioStatus.value = `error: ${mapMediaError(err)}`
+  })
+
+  el.addEventListener('canplay', () => {
+    // 로드가 됐는지 확인용
+    if (!hasPlayedAudio.value && isAndroid.value) {
+      // 너무 시끄럽지 않게: 상태가 비어있을 때만
+      if (!audioStatus.value) audioStatus.value = 'ready (tap background to play)'
+    }
+  })
+})
+
+/* 눈 */
 const snows = Array.from({ length: 40 }).map(() => ({
   left: Math.random() * 100 + '%',
   duration: 6 + Math.random() * 8 + 's',
@@ -119,26 +169,25 @@ const snows = Array.from({ length: 40 }).map(() => ({
 </script>
 
 <template>
-  <div
-    class="page"
-    @pointerdown="handleBackgroundTouch"
-    @click="openLetter"
-  >
-    <!-- 🎵 audio -->
+  <div class="page" @pointerdown="handleBackgroundTouch" @click="openLetter">
+    <!-- 오디오: 반드시 DOM에 있어야 함 -->
     <audio
       ref="audioRef"
       :src="bgm"
       preload="auto"
       playsinline
+      webkit-playsinline
     ></audio>
 
-    <!-- 💡 Android 안내 문구 -->
-    <div
-      v-if="isAndroid && !hasPlayedAudio"
-      class="android-hint"
-    >
+    <!-- Android 안내 문구 -->
+    <div v-if="isAndroid && !hasPlayedAudio" class="android-hint">
       배경을 한 번 터치하면<br />
       음악이 시작돼요 🎵
+    </div>
+
+    <!-- Android 디버그 상태(실제 실패 이유를 보여줌) -->
+    <div v-if="isAndroid && !hasPlayedAudio && audioStatus" class="android-debug">
+      {{ audioStatus }}
     </div>
 
     <div class="card">
@@ -150,7 +199,6 @@ const snows = Array.from({ length: 40 }).map(() => ({
       <pre v-else class="letter">{{ displayedText }}</pre>
     </div>
 
-    <!-- ❄️ 눈 -->
     <span
       v-for="(snow, i) in snows"
       :key="i"
@@ -178,24 +226,6 @@ const snows = Array.from({ length: 40 }).map(() => ({
   padding: 20px;
   overflow: hidden;
   font-family: 'Pretendard', system-ui, -apple-system, sans-serif;
-}
-
-/* 💡 Android 안내 */
-.android-hint {
-  position: fixed;
-  bottom: 28px;
-  text-align: center;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
-  line-height: 1.4;
-  z-index: 5;
-  animation: fadePulse 2s ease-in-out infinite;
-}
-
-@keyframes fadePulse {
-  0% { opacity: 0.4; }
-  50% { opacity: 1; }
-  100% { opacity: 0.4; }
 }
 
 .card {
@@ -234,6 +264,38 @@ const snows = Array.from({ length: 40 }).map(() => ({
   line-height: 1.75;
   color: #333;
   margin: 0;
+}
+
+.android-hint {
+  position: fixed;
+  bottom: 28px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.4;
+  z-index: 5;
+  animation: fadePulse 2s ease-in-out infinite;
+}
+
+.android-debug {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 82px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  line-height: 1.35;
+  z-index: 6;
+  word-break: break-word;
+}
+
+@keyframes fadePulse {
+  0% { opacity: 0.45; }
+  50% { opacity: 1; }
+  100% { opacity: 0.45; }
 }
 
 .snow {
